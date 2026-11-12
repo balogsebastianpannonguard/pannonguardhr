@@ -23,6 +23,10 @@ async function connect(uri: string) {
     db.collection("login_throttle").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection("audit_log").createIndex({ userId: 1, at: -1 }),
     db.collection("users").createIndex({ email: 1 }, { unique: true }),
+    db.collection("hr_log").createIndex({ entity: 1, entityId: 1, at: -1 }),
+    db.collection("hr_legal").createIndex({ ownerId: 1, createdAt: -1 }),
+    db.collection("hr_drafts").createIndex({ ownerId: 1, updatedAt: -1 }),
+    db.collection("assistant_usage").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
   ]);
   return client;
 }

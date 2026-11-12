@@ -2,77 +2,13 @@ import "server-only";
 import { ObjectId, type Filter } from "mongodb";
 import { openData, sealData } from "@/lib/data-box";
 import { addDays, dayKey } from "@/lib/dates";
+import { expiriesOf, type EmployeeSecret, type EmployeeStatus, type EmploymentType, type ExitReason, type Qualification } from "@/lib/employee-meta";
 import { getDb } from "@/lib/mongodb";
 
-/* ---------- Szótárak (a felületen és az AI-promptokban is ezek a megnevezések) ---------- */
-
-export const EMPLOYEE_STATUS = {
-  aktiv: "Aktív",
-  belepes: "Belépés alatt",
-  szunetel: "Szünetel (GYED, tartós távollét)",
-  kilepett: "Kilépett",
-} as const;
-export type EmployeeStatus = keyof typeof EMPLOYEE_STATUS;
-
-export const EMPLOYMENT_TYPES = {
-  hatarozatlan: "Határozatlan idejű",
-  hatarozott: "Határozott idejű",
-  reszmunkaido: "Részmunkaidős",
-  megbizasi: "Megbízási jogviszony",
-  diak: "Diákmunka",
-} as const;
-export type EmploymentType = keyof typeof EMPLOYMENT_TYPES;
-
-export const QUALIFICATION_KINDS = {
-  vegzettseg: "Végzettség",
-  kepesites: "Képesítés",
-  igazolvany: "Igazolvány / engedély",
-  jogositvany: "Jogosítvány",
-  egyeb: "Egyéb jogosultság",
-} as const;
-export type QualificationKind = keyof typeof QUALIFICATION_KINDS;
-
-export const EXIT_REASONS = {
-  munkavallaloi_felmondas: "Munkavállalói felmondás",
-  munkaltatoi_felmondas: "Munkáltatói felmondás",
-  kozos_megegyezes: "Közös megegyezés",
-  hatarozott_lejart: "Határozott idő lejárta",
-  probaido: "Próbaidő alatti megszüntetés",
-  azonnali: "Azonnali hatályú megszüntetés",
-  nyugdij: "Nyugdíjba vonulás",
-  egyeb: "Egyéb",
-} as const;
-export type ExitReason = keyof typeof EXIT_REASONS;
+/* A szótárak, a lejárat-számítás és a dátumsegédek kliensoldalon is kellenek, ezért külön fájlban élnek. */
+export * from "@/lib/employee-meta";
 
 /* ---------- Adatmodell ---------- */
-
-export type Qualification = {
-  id: string;
-  kind: QualificationKind;
-  name: string;
-  /** Okmány- vagy bizonyítványszám. */
-  number?: string;
-  /** ÉÉÉÉ-HH-NN */
-  issuedAt?: string;
-  /** ÉÉÉÉ-HH-NN – ha van, a lejárat figyelése ebből történik. */
-  expiresAt?: string;
-  note?: string;
-};
-
-/** Bizalmas adatok: csak titkosítva kerülnek az adatbázisba (`secret` mező). */
-export type EmployeeSecret = {
-  birthName?: string;
-  birthPlace?: string;
-  birthDate?: string;
-  motherName?: string;
-  address?: string;
-  taxId?: string;
-  tajNumber?: string;
-  bankAccount?: string;
-  /** Bruttó alapbér forintban. */
-  salary?: number;
-  salaryType?: "havi" | "oraber";
-};
 
 export type EmployeeDocument = {
   _id: ObjectId;
@@ -159,7 +95,7 @@ export async function listEmployees({ q, status, position, department }: Employe
   if (department) filter.department = department;
   if (q?.trim()) {
     const pattern = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-    filter.$or = [{ name: pattern }, { email: pattern }, { position: pattern }, { department: pattern }, { "qualifications.name": pattern }];
+    filter.$or = [{ name: pattern }, { email: pattern }, { phone: pattern }, { position: pattern }, { department: pattern }, { "qualifications.name": pattern }];
   }
   const docs = await (await employees()).find(filter, { projection: { secret: 0 } }).sort({ name: 1 }).limit(2000).toArray();
   return docs.map(toEmployee);
@@ -192,33 +128,6 @@ export async function employeeFacets() {
 
 /* ---------- Lejárat-figyelés ---------- */
 
-export type Expiry = {
-  employeeId: string;
-  employeeName: string;
-  kind: "orvosi" | "vagyonor" | "kepesites" | "szerzodes" | "probaido";
-  label: string;
-  date: string;
-  daysLeft: number;
-};
-
-const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
-
-/** Egy dolgozó figyelendő dátumai (a lejártak is, negatív napszámmal). */
-export function expiriesOf(employee: Pick<Employee, "id" | "name" | "medicalExpiry" | "guardLicenseExpiry" | "contractEnd" | "probationEnd" | "qualifications" | "status">, today = dayKey(new Date())): Expiry[] {
-  if (employee.status === "kilepett") return [];
-  const base = { employeeId: employee.id, employeeName: employee.name };
-  const items: Expiry[] = [];
-  const push = (kind: Expiry["kind"], label: string, date?: string) => {
-    if (date) items.push({ ...base, kind, label, date, daysLeft: daysBetween(today, date) });
-  };
-  push("orvosi", "Foglalkozás-egészségügyi alkalmasság", employee.medicalExpiry);
-  push("vagyonor", "Vagyonőri igazolvány", employee.guardLicenseExpiry);
-  push("szerzodes", "Határozott idejű szerződés vége", employee.contractEnd);
-  push("probaido", "Próbaidő vége", employee.probationEnd);
-  for (const qualification of employee.qualifications ?? []) push("kepesites", qualification.name, qualification.expiresAt);
-  return items;
-}
-
 /** Az összes aktív dolgozó `withinDays` napon belül lejáró (vagy már lejárt) tételei, sürgősség szerint. */
 export async function upcomingExpiries(withinDays = 60) {
   const today = dayKey(new Date());
@@ -235,5 +144,33 @@ export async function upcomingExpiries(withinDays = 60) {
     .sort((a, b) => a.daysLeft - b.daysLeft);
 }
 
-export const expiryTone = (daysLeft: number) => (daysLeft < 0 ? "error" : daysLeft <= 30 ? "warning" : "muted") as "error" | "warning" | "muted";
-export const expiryText = (daysLeft: number) => (daysLeft < 0 ? `${-daysLeft} napja lejárt` : daysLeft === 0 ? "ma jár le" : `${daysLeft} nap múlva`);
+
+/* ---------- Összesítők ---------- */
+
+/** Állapotonkénti létszám (a listaoldal számlálóihoz). */
+export async function employeeStatusCounts() {
+  await ensureIndexes();
+  const rows = await (await employees()).aggregate<{ _id: EmployeeStatus; count: number }>([{ $group: { _id: "$status", count: { $sum: 1 } } }]).toArray();
+  const counts: Record<EmployeeStatus, number> = { aktiv: 0, belepes: 0, szunetel: 0, kilepett: 0 };
+  for (const row of rows) if (row._id in counts) counts[row._id] = row.count;
+  return counts;
+}
+
+/** Az áttekintő létszámadatai: állapotok, valamint az adott hónap belépői és kilépői. */
+export async function headcountSummary(now = new Date()) {
+  const month = dayKey(now).slice(0, 7);
+  const range = { $gte: `${month}-01`, $lte: `${month}-31` };
+  const collection = await employees();
+  const [counts, joiners, leavers] = await Promise.all([
+    employeeStatusCounts(),
+    collection.countDocuments({ startDate: range, status: { $ne: "kilepett" } }),
+    collection.countDocuments({ exitDate: range }),
+  ]);
+  return { counts, joiners, leavers };
+}
+
+/** Egy dolgozó a felület számára (a bizalmas adatok nélkül). */
+export async function getEmployeeView(id: string) {
+  const doc = await getEmployee(id);
+  return doc ? { employee: toEmployee(doc), hasSecret: Boolean(doc.secret) } : null;
+}

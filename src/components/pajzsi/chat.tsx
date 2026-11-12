@@ -10,7 +10,8 @@ export type Turn = { role: "user" | "assistant"; content: string; error?: boolea
 export type TabKey = "chat" | "ticket";
 
 /** A válaszokban kattinthatóvá tett belső útvonalak. */
-const ROUTES = ["/biztonsag"];
+// Hosszabb útvonal előbb, hogy a „/munkavallalok/uj” ne csak „/munkavallalok”-ként legyen link.
+const ROUTES = ["/munkavallalok/uj", "/munkavallalok", "/lejaratok", "/tavollet", "/be-kilepes", "/dokumentumok", "/toborzas", "/kepzesek", "/kimutatasok", "/jog", "/kommunikacio", "/biztonsag"];
 
 const TONE: Record<BriefingItem["tone"], string> = {
   ok: "border-emerald-400/25 bg-emerald-400/8 text-emerald-100",

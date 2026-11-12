@@ -3,28 +3,62 @@ import type { ObjectId } from "mongodb";
 import type { BriefingItem } from "@/components/pajzsi/api";
 import { budapestHour, formatDay } from "@/lib/dates";
 import { getDb } from "@/lib/mongodb";
+import { EMPLOYEE_STATUS, employees } from "@/lib/employees";
+import { allExpiries } from "@/lib/expiries";
 import { loadActivity } from "@/lib/overview";
 
 /** Az asszisztens oldalai: a válaszokban csak ezekre hivatkozhat (a csevegőablak ezeket teszi kattinthatóvá). */
 export const ASSISTANT_PAGES = [
   { href: "/", label: "Áttekintés" },
+  { href: "/munkavallalok", label: "Munkavállalók (törzsadatok, munkaviszony, bér, képesítések, CSV import/export)" },
+  { href: "/munkavallalok/uj", label: "Új munkavállaló felvétele" },
+  { href: "/lejaratok", label: "Lejáratok (orvosi alkalmasság, vagyonőri igazolvány, képesítések, szerződések)" },
+  { href: "/tavollet", label: "Távollétek (szabadság, betegség, naptár, szabadságkeret)" },
+  { href: "/be-kilepes", label: "Belépés és kilépés (ellenőrzőlisták)" },
+  { href: "/dokumentumok", label: "HR-dokumentumok (munkaszerződés, módosítás, tájékoztató, igazolás sablonból)" },
+  { href: "/toborzas", label: "Toborzás (álláshelyek, hirdetés, önéletrajz-feldolgozás, jelöltek, interjú)" },
+  { href: "/kepzesek", label: "Képzések (résztvevők, vizsgák, tanúsítványok lejárata, kilépők)" },
+  { href: "/kimutatasok", label: "Kimutatások (létszám, fluktuáció, távollét, képzés, vezetői riport)" },
+  { href: "/jog", label: "Jog és szabályzat (munkajogi kérdések, szabályzat-ellenőrzés, összehasonlítás)" },
+  { href: "/kommunikacio", label: "Kommunikáció (e-mail, tájékoztató, közlemény, munkaköri leírás)" },
   { href: "/biztonsag", label: "Biztonság" },
 ] as const;
 
-/** A nyitólap rövid helyzetképe a saját fiókról; AI nélkül is működik. */
+/** A nyitólap rövid helyzetképe: lejáratok, létszám és a fiók állapota; AI nélkül is működik, nevek nélkül. */
 export async function loadBriefing(user: { session: { userId: ObjectId }; totpEnabledAt?: Date }, sessions: number): Promise<BriefingItem[]> {
-  const activity = await loadActivity(user.session.userId, new Date());
+  const [activity, expiries, counts] = await Promise.all([
+    loadActivity(user.session.userId, new Date()),
+    allExpiries(30).catch(() => []),
+    employees()
+      .then((collection) => collection.aggregate<{ _id: keyof typeof EMPLOYEE_STATUS; count: number }>([{ $group: { _id: "$status", count: { $sum: 1 } } }]).toArray())
+      .catch(() => []),
+  ]);
   const items: BriefingItem[] = [];
+
+  const expired = expiries.filter((item) => item.daysLeft < 0).length;
+  const soon = expiries.length - expired;
+  if (expired) items.push({ tone: "bad", text: `${expired} lejárt dokumentum vagy alkalmasság vár intézkedésre.`, href: "/lejaratok" });
+  if (soon) items.push({ tone: "warn", text: `${soon} tétel jár le a következő 30 napban (orvosi, igazolvány, képesítés, szerződés).`, href: "/lejaratok" });
+
+  const byStatus = Object.fromEntries(counts.map((row) => [row._id, row.count]));
+  if (byStatus.aktiv || byStatus.belepes) {
+    items.push({
+      tone: "info",
+      text: `${byStatus.aktiv ?? 0} aktív munkavállaló${byStatus.belepes ? `, ${byStatus.belepes} belépés alatt` : ""}.`,
+      href: "/munkavallalok",
+    });
+  } else {
+    items.push({ tone: "info", text: "Még nincs rögzített munkavállaló: kezdd egy CSV-importtal vagy az első felvétellel.", href: "/munkavallalok" });
+  }
+
   if (activity.failures) {
     items.push({ tone: "warn", text: `Az elmúlt 30 napban ${activity.failures} sikertelen belépési kísérlet volt a fiókodon.`, href: "/biztonsag" });
   }
   if (sessions > 1) items.push({ tone: "info", text: `${sessions} eszközön vagy most belépve.`, href: "/biztonsag" });
-  items.unshift({
-    tone: user.totpEnabledAt ? "ok" : "warn",
-    text: user.totpEnabledAt ? "A fiókod kétlépcsős azonosítással védett. 💗" : "Állítsd be a hitelesítő alkalmazást.",
-    href: "/biztonsag",
-  });
-  items.push({ tone: "info", text: "A munkavállalók, iratok és felvétel moduljai hamarosan érkeznek." });
+  if (!user.totpEnabledAt) items.push({ tone: "warn", text: "Állítsd be a hitelesítő alkalmazást.", href: "/biztonsag" });
+  if (!items.some((item) => item.tone === "bad" || item.tone === "warn")) {
+    items.unshift({ tone: "ok", text: "Minden rendben, nincs sürgős lejárat. 💗", href: "/lejaratok" });
+  }
   return items;
 }
 
@@ -49,9 +83,9 @@ Mit tudsz: HR-folyamatok és munkajogi alapok magyarázata, levél- és szövegv
 
 Ha a rendszer oldalaira mutatsz, a pontos útvonalat írd ki (pl. /biztonsag), így a felhasználó rákattinthat. Csak ezeket használd:
 ${pages}
-A munkavállalók, iratok, felvétel és a szabadság modulja még fejlesztés alatt áll; ha ezek iránt érdeklődik, mondd el, hogy hamarosan jönnek, és addig szívesen segítesz vázlattal vagy ellenőrzőlistával.
+Ha a felhasználó valamit a rendszerben szeretne elintézni, irányítsd a megfelelő oldalra (pl. dokumentumot sablonból a /dokumentumok, jelöltet a /toborzas oldalon). Konkrét munkavállalói adatot nem látsz és nem is kérsz.
 
-A fiók helyzete:
+Élő helyzetkép (csak darabszámok):
 ${status}
 
 ${HR_FACTS}

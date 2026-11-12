@@ -8,3 +8,10 @@
 - **Webes védelem:** CSP, HSTS, clickjacking- és MIME-védelem, noindex.
 
 Teendő élesítés előtt: a HR-adatok (munkavállalók, iratok) bevezetésekor rögzíteni az adatkezelési célt és a megőrzési időt (GDPR 30. cikk).
+
+## HR-adatok (2026-11)
+
+- A bér, az azonosítók (adóazonosító, TAJ, bankszámla), a lakcím és a születési adatok mezőszinten titkosítva (AES-256-GCM, `DATA_ENCRYPTION_KEY`); a generált HR-dokumentumok, jogi elemzések és piszkozatok törzse szintén.
+- Minden módosítás a `hr_log` naplóba kerül személyes adat nélkül; a bizalmas adatok megtekintése is naplózott.
+- AI (Google Gemini): önéletrajz-feldolgozásnál és dokumentum-ellenőrzésnél a feltöltött szöveg a Gemini API-hoz kerül; a riportokhoz csak összesített számok mennek, a sablonos dokumentumok kitöltése AI nélkül, a szerveren történik. Az önéletrajz eredeti fájlja nem tárolódik.
+- Teendő: az adatkezelési tájékoztatóban és a nyilvántartásban (GDPR 30. cikk) rögzíteni a Gemini adatfeldolgozót, a jelöltadatok megőrzési idejét (alapértelmezés: elutasítás után 180 nap) és a munkavállalói adatok megőrzési idejét.
