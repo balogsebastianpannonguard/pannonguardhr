@@ -42,12 +42,12 @@ export function ResetPasswordForm({ token }: { token: string }) {
         </Field>
         <div aria-hidden className="mt-2.5 grid grid-cols-3 gap-1.5">
           {RULES.map((rule, index) => (
-            <span key={rule.label} className={`h-1 rounded-full transition-colors ${index < score ? (score === 3 ? "bg-mint" : "bg-mint/55") : "bg-white/10"}`} />
+            <span key={rule.label} className={`h-1 rounded-full transition-colors ${index < score ? (score === 3 ? "bg-rose" : "bg-rose/55") : "bg-white/10"}`} />
           ))}
         </div>
         <ul className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-xs">
           {RULES.map(({ label, test }) => (
-            <li key={label} className={`flex items-center gap-1 ${test(password) ? "text-mint-bright" : "text-white/40"}`}>
+            <li key={label} className={`flex items-center gap-1 ${test(password) ? "text-rose-bright" : "text-white/40"}`}>
               <Check size={12} aria-hidden /> {label}
             </li>
           ))}
@@ -56,7 +56,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
 
       <Field label="Új jelszó még egyszer" icon={<Lock size={18} aria-hidden />}>
         <input name="confirm" type={show ? "text" : "password"} value={confirm} onChange={(event) => setConfirm(event.target.value)} autoComplete="new-password" required className={inputClass} />
-        {confirm && <Check size={18} aria-label={confirm === password ? "Egyezik" : undefined} className={confirm === password ? "text-mint" : "text-white/15"} />}
+        {confirm && <Check size={18} aria-label={confirm === password ? "Egyezik" : undefined} className={confirm === password ? "text-rose" : "text-white/15"} />}
       </Field>
 
       <p role="alert" className="min-h-5 text-sm font-medium text-red-300">

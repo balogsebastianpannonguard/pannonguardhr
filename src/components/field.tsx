@@ -16,7 +16,7 @@ export function Field({
       <span className="mb-2 block text-sm font-medium text-white/70">{label}</span>
       <span className="pg-field flex items-center gap-3 rounded-xl px-4">
         {icon && (
-          <span className="text-white/40 transition-colors group-focus-within:text-mint">{icon}</span>
+          <span className="text-white/40 transition-colors group-focus-within:text-rose">{icon}</span>
         )}
         {children}
       </span>

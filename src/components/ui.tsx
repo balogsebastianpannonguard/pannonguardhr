@@ -22,7 +22,7 @@ export function Panel({
           {title && (
             <h2 className="flex items-center gap-2.5 font-display text-lg font-semibold">
               {Icon && (
-                <span className="grid size-8 place-items-center rounded-lg bg-mint/15 text-mint">
+                <span className="grid size-8 place-items-center rounded-lg bg-rose/15 text-rose">
                   <Icon size={16} aria-hidden />
                 </span>
               )}
@@ -41,7 +41,7 @@ const TONES = {
   ok: "bg-emerald-400/12 text-emerald-200 ring-emerald-300/25",
   warning: "bg-amber-400/12 text-amber-200 ring-amber-300/25",
   error: "bg-red-500/12 text-red-200 ring-red-400/25",
-  info: "bg-leaf/20 text-leaf-bright ring-leaf-bright/25",
+  info: "bg-pink/20 text-pink-bright ring-pink-bright/25",
   muted: "bg-white/6 text-white/60 ring-white/10",
 } as const;
 
@@ -61,7 +61,7 @@ export function Pill({ tone = "muted", children, icon: Icon }: { tone?: Tone; ch
 export function Empty({ icon: Icon, title, text, action }: { icon: LucideIcon; title: string; text?: string; action?: ReactNode }) {
   return (
     <div className="grid place-items-center rounded-3xl border border-dashed border-white/12 px-6 py-14 text-center">
-      <span className="grid size-14 place-items-center rounded-2xl bg-mint/10 text-mint">
+      <span className="grid size-14 place-items-center rounded-2xl bg-rose/10 text-rose">
         <Icon size={26} aria-hidden />
       </span>
       <p className="mt-4 font-display text-lg font-semibold">{title}</p>

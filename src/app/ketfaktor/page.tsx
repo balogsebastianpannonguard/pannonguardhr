@@ -18,7 +18,7 @@ export default function TwoFactorPage() {
       <Backdrop />
       <div className="relative mx-auto max-w-4xl">
         <Brand size="lg" />
-        <p className="mt-12 text-xs font-semibold tracking-[0.22em] text-mint uppercase">
+        <p className="mt-12 text-xs font-semibold tracking-[0.22em] text-rose uppercase">
           Utolsó lépés · Kétlépcsős azonosítás
         </p>
         <h1 className="mt-3 font-display text-4xl leading-tight font-semibold tracking-tight sm:text-5xl">
@@ -72,7 +72,7 @@ async function Setup() {
       </Step>
 
       <Step number={2} title="Olvasd be a QR-kódot">
-        <div className="mx-auto w-fit rounded-2xl bg-white p-3 shadow-[0_20px_60px_-20px_rgb(52_211_153/0.45)]">
+        <div className="mx-auto w-fit rounded-2xl bg-white p-3 shadow-[0_20px_60px_-20px_rgb(232_167_150/0.45)]">
           {/* A QR-kód data URL, a Next képoptimalizálója nem kezeli. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={qr} alt="QR-kód a hitelesítő alkalmazáshoz" width={176} height={176} />
@@ -110,7 +110,7 @@ function Step({
       style={{ animationDelay: `${number * 0.08}s` }}
     >
       <div className="mb-4 flex items-center gap-3">
-        <span className="grid size-8 place-items-center rounded-full bg-mint font-display text-sm font-bold text-ink-950">
+        <span className="grid size-8 place-items-center rounded-full bg-rose font-display text-sm font-bold text-ink-950">
           {number}
         </span>
         <h2 className="font-display text-lg font-semibold">{title}</h2>

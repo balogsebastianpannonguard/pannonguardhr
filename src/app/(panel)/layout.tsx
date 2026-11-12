@@ -2,8 +2,15 @@ import type { ReactNode } from "react";
 import { Suspense } from "react";
 import { ShieldCheck } from "lucide-react";
 import { Backdrop, Brand } from "@/components/brand";
+import { Pajzsi } from "@/components/pajzsi/pajzsi";
+import { aiAvailable } from "@/lib/ai";
+import { askAssistant, assistantBriefing } from "@/lib/actions/assistant";
+import { submitTicket } from "@/lib/actions/tickets";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { UserCard, UserCardSkeleton } from "@/components/user-card";
+
+// Pajzsi csevegése bármelyik oldalról indulhat.
+export const maxDuration = 60;
 
 export default function PanelLayout({ children }: { children: ReactNode }) {
   return (
@@ -18,7 +25,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
 
         <div className="space-y-3 border-t border-white/8 pt-4">
           <p className="flex items-center gap-2 px-1 text-xs text-white/45">
-            <ShieldCheck size={14} aria-hidden className="text-mint" /> Kétlépcsős azonosítással védett munkamenet
+            <ShieldCheck size={14} aria-hidden className="text-rose" /> Kétlépcsős azonosítással védett munkamenet
           </p>
           <Suspense fallback={<UserCardSkeleton />}>
             <UserCard />
@@ -38,8 +45,9 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
             <SidebarNav compact />
           </div>
         </header>
-        <main className="mx-auto max-w-6xl px-5 py-8 sm:px-8 lg:py-12">{children}</main>
+        <main className="mx-auto max-w-6xl px-5 py-8 pb-28 sm:px-8 lg:py-12 lg:pb-28">{children}</main>
       </div>
+      <Pajzsi aiOn={aiAvailable()} api={{ ask: askAssistant, briefing: assistantBriefing, ticket: submitTicket }} />
     </div>
   );
 }

@@ -10,7 +10,7 @@ import {
   MonitorSmartphone,
   PartyPopper,
   ShieldCheck,
-  Sprout,
+  Sparkles,
   UserRoundPlus,
   Users,
   type LucideIcon,
@@ -51,14 +51,14 @@ async function Overview({ searchParams }: Pick<PageProps<"/">, "searchParams">) 
       value: user.totpEnabledAt ? "Aktív" : "Hiányzik",
       note: user.totpEnabledAt ? `${formatStamp(user.totpEnabledAt)} óta védett a fiókod` : "Állítsd be a hitelesítőt",
       icon: ShieldCheck,
-      tone: user.totpEnabledAt ? "text-mint-bright" : "text-amber-300",
+      tone: user.totpEnabledAt ? "text-rose-bright" : "text-amber-300",
     },
     {
       label: "Aktív munkamenet",
       value: String(sessions),
       note: sessions === 1 ? "csak ez az eszköz" : "eszközön vagy belépve",
       icon: MonitorSmartphone,
-      tone: "text-leaf-bright",
+      tone: "text-pink-bright",
       href: "/biztonsag",
     },
     {
@@ -74,8 +74,8 @@ async function Overview({ searchParams }: Pick<PageProps<"/">, "searchParams">) 
   return (
     <div className="space-y-8">
       {params.udv === "1" && (
-        <div className="pg-rise flex items-center gap-4 rounded-2xl border border-mint/25 bg-linear-to-r from-mint/15 to-transparent p-5">
-          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-mint/20 text-mint">
+        <div className="pg-rise flex items-center gap-4 rounded-2xl border border-rose/25 bg-linear-to-r from-rose/15 to-transparent p-5">
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-rose/20 text-rose">
             <PartyPopper size={22} aria-hidden />
           </span>
           <div>
@@ -86,11 +86,11 @@ async function Overview({ searchParams }: Pick<PageProps<"/">, "searchParams">) 
       )}
 
       <section className="pg-panel pg-rise relative overflow-hidden rounded-[2rem] p-8 sm:p-10">
-        <div aria-hidden className="pointer-events-none absolute -top-24 -right-16 size-80 rounded-full bg-leaf/25 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute -bottom-32 left-1/3 size-72 rounded-full bg-mint/20 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -top-24 -right-16 size-80 rounded-full bg-pink/25 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-32 left-1/3 size-72 rounded-full bg-rose/20 blur-3xl" />
         <div className="relative">
-          <p className="flex items-center gap-2 text-xs font-semibold tracking-[0.22em] text-mint uppercase">
-            <Sprout size={15} aria-hidden /> HR · {today.format(now)}
+          <p className="flex items-center gap-2 text-xs font-semibold tracking-[0.22em] text-rose uppercase">
+            <Sparkles size={15} aria-hidden /> HR · {today.format(now)}
           </p>
           <h1 className="mt-4 font-display text-4xl leading-tight font-semibold tracking-tight sm:text-5xl">
             {greeting(now)},
@@ -116,7 +116,7 @@ async function Overview({ searchParams }: Pick<PageProps<"/">, "searchParams">) 
               <p className="mt-1 truncate text-xs text-white/45">{note}</p>
             </>
           );
-          const className = "pg-card pg-rise block rounded-2xl bg-linear-to-br from-mint/10 to-transparent p-5";
+          const className = "pg-card pg-rise block rounded-2xl bg-linear-to-br from-rose/10 to-transparent p-5";
           const style = { animationDelay: `${0.1 + index * 0.06}s` };
           return href ? (
             <Link key={label} href={href} className={`${className} hover:bg-white/5`} style={style}>
@@ -138,7 +138,7 @@ async function Overview({ searchParams }: Pick<PageProps<"/">, "searchParams">) 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {AREAS.map(({ title, text, icon: Icon }, index) => (
             <div key={title} className="pg-card pg-rise rounded-2xl p-5" style={{ animationDelay: `${0.25 + index * 0.06}s` }}>
-              <span className="grid size-10 place-items-center rounded-xl bg-leaf/15 text-leaf-bright">
+              <span className="grid size-10 place-items-center rounded-xl bg-pink/15 text-pink-bright">
                 <Icon size={19} aria-hidden />
               </span>
               <p className="mt-4 font-semibold">{title}</p>
@@ -149,7 +149,7 @@ async function Overview({ searchParams }: Pick<PageProps<"/">, "searchParams">) 
       </section>
 
       <p className="flex items-center gap-2 text-xs text-white/40">
-        <CircleCheck size={14} aria-hidden className="text-mint" /> A fiókod kétlépcsős azonosítással védett; a biztonsági
+        <CircleCheck size={14} aria-hidden className="text-rose" /> A fiókod kétlépcsős azonosítással védett; a biztonsági
         részleteket a Biztonság oldalon látod.
       </p>
     </div>

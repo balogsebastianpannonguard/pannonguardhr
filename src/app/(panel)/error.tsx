@@ -2,7 +2,8 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { Home, RotateCcw, TriangleAlert } from "lucide-react";
+import { Bug, Home, RotateCcw, TriangleAlert } from "lucide-react";
+import { PAJZSI_TICKET_EVENT, type PajzsiTicketDetail } from "@/components/pajzsi/pajzsi";
 
 /** A panel oldalainak hibaoldala újrapróbálással és a hiba azonosítójával. */
 export default function PanelError({ error, retry }: { error: unknown; retry: () => void }) {
@@ -30,6 +31,19 @@ export default function PanelError({ error, retry }: { error: unknown; retry: ()
       <div className="mt-7 flex flex-wrap justify-center gap-2">
         <button type="button" onClick={() => retry()} className="pg-button flex h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold">
           <RotateCcw size={16} aria-hidden /> Újrapróbálás
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            window.dispatchEvent(
+              new CustomEvent<PajzsiTicketDetail>(PAJZSI_TICKET_EVENT, {
+                detail: { text: "Hibaoldal jelent meg ezen az oldalon.", diagnostics: digest ? [`Hibaazonosító: ${digest}`] : [] },
+              }),
+            )
+          }
+          className="flex h-11 items-center gap-2 rounded-xl border border-rose/40 px-5 text-sm text-rose transition hover:bg-rose/10"
+        >
+          <Bug size={16} aria-hidden /> Jelentsd be Pajzsinak
         </button>
         <Link href="/" className="flex h-11 items-center gap-2 rounded-xl border border-white/12 px-5 text-sm text-white/70 transition hover:border-white/30 hover:text-white">
           <Home size={16} aria-hidden /> Áttekintés

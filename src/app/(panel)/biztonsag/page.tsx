@@ -21,15 +21,15 @@ import { countActiveSessions, requireUser } from "@/lib/session";
 export const metadata: Metadata = { title: "Biztonság" };
 
 const EVENTS: Record<AuditEvent, { label: string; icon: LucideIcon; tone: string }> = {
-  register: { label: "Regisztráció", icon: UserRoundPlus, tone: "text-leaf-bright" },
-  "totp.enabled": { label: "Hitelesítő bekapcsolva", icon: ShieldCheck, tone: "text-mint" },
+  register: { label: "Regisztráció", icon: UserRoundPlus, tone: "text-pink-bright" },
+  "totp.enabled": { label: "Hitelesítő bekapcsolva", icon: ShieldCheck, tone: "text-rose" },
   "login.success": { label: "Sikeres belépés", icon: LogIn, tone: "text-emerald-300" },
   "login.failure": { label: "Hibás jelszó", icon: CircleAlert, tone: "text-red-300" },
   "login.locked": { label: "Zárolt belépés", icon: ShieldX, tone: "text-red-300" },
   "totp.failure": { label: "Hibás hitelesítő kód", icon: KeyRound, tone: "text-amber-300" },
   logout: { label: "Kijelentkezés", icon: LogOut, tone: "text-white/60" },
   "logout.all": { label: "Kijelentkezés minden eszközről", icon: LogOut, tone: "text-white/60" },
-  "password.reset": { label: "Jelszó visszaállítva", icon: KeyRound, tone: "text-mint" },
+  "password.reset": { label: "Jelszó visszaállítva", icon: KeyRound, tone: "text-rose" },
 };
 
 function device(userAgent: string) {
@@ -110,7 +110,7 @@ async function Security() {
 
         <section className="pg-panel rounded-3xl p-6">
           <div className="flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-2xl bg-leaf/25 text-leaf-bright">
+            <span className="grid size-11 place-items-center rounded-2xl bg-pink/25 text-pink-bright">
               <MonitorSmartphone size={22} aria-hidden />
             </span>
             <div>

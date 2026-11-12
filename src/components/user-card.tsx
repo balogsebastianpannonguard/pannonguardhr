@@ -12,7 +12,7 @@ export async function UserCard({ compact = false }: { compact?: boolean }) {
 
   return (
     <div className="flex items-center gap-3" title={compact ? `${user.name} · ${user.email}` : undefined}>
-      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-linear-to-br from-mint-bright to-leaf-bright font-display text-sm font-bold text-ink-950 uppercase">
+      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-linear-to-br from-rose-bright to-pink-bright font-display text-sm font-bold text-ink-950 uppercase">
         {initials}
       </span>
       <div className={`min-w-0 flex-1 ${compact ? "sr-only" : ""}`}>

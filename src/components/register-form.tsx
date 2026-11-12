@@ -61,7 +61,7 @@ export function RegisterForm({ token }: { token: string }) {
             <span
               key={rule.label}
               className={`h-1 rounded-full transition-colors ${
-                index < score ? (score === 3 ? "bg-mint" : "bg-mint/55") : "bg-white/10"
+                index < score ? (score === 3 ? "bg-rose" : "bg-rose/55") : "bg-white/10"
               }`}
             />
           ))}
@@ -70,7 +70,7 @@ export function RegisterForm({ token }: { token: string }) {
           {RULES.map(({ label, test }) => (
             <li
               key={label}
-              className={`flex items-center gap-1 ${test(password) ? "text-mint-bright" : "text-white/40"}`}
+              className={`flex items-center gap-1 ${test(password) ? "text-rose-bright" : "text-white/40"}`}
             >
               <Check size={12} aria-hidden /> {label}
             </li>
@@ -92,7 +92,7 @@ export function RegisterForm({ token }: { token: string }) {
           <Check
             size={18}
             aria-label={confirm === password ? "Egyezik" : undefined}
-            className={confirm === password ? "text-mint" : "text-white/15"}
+            className={confirm === password ? "text-rose" : "text-white/15"}
           />
         )}
       </Field>

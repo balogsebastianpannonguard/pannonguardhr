@@ -47,7 +47,7 @@ async function Registration({ searchParams }: Pick<PageProps<"/regisztracio">, "
           <CircleAlert size={19} aria-hidden className="mt-0.5 shrink-0 text-red-300" />
           <p>{check ? PROBLEMS[check.status] : "A regisztráció átmenetileg nem érhető el."}</p>
         </div>
-        <Link href="/login" className="inline-block text-sm text-mint underline underline-offset-4">
+        <Link href="/login" className="inline-block text-sm text-rose underline underline-offset-4">
           Tovább a belépéshez
         </Link>
       </div>
@@ -56,8 +56,8 @@ async function Registration({ searchParams }: Pick<PageProps<"/regisztracio">, "
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3 rounded-2xl border border-mint/20 bg-mint/8 p-4">
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-mint/15 text-mint">
+      <div className="flex items-center gap-3 rounded-2xl border border-rose/20 bg-rose/8 p-4">
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-rose/15 text-rose">
           <MailCheck size={19} aria-hidden />
         </span>
         <div className="min-w-0 text-sm">

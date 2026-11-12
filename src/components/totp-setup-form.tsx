@@ -17,10 +17,10 @@ export function CopySecret({ secret }: { secret: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 1800);
       }}
-      className="group flex w-full items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/4 px-4 py-3 text-left transition hover:border-mint/40"
+      className="group flex w-full items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/4 px-4 py-3 text-left transition hover:border-rose/40"
     >
       <code className="font-mono text-sm tracking-wider text-white/85 [word-spacing:0.15em]">{secret}</code>
-      <span className="shrink-0 text-white/45 group-hover:text-mint">
+      <span className="shrink-0 text-white/45 group-hover:text-rose">
         {copied ? <Check size={16} aria-label="Másolva" /> : <Copy size={16} aria-label="Kulcs másolása" />}
       </span>
     </button>
@@ -36,7 +36,7 @@ export function TotpSetupForm() {
         <p role="alert" className="text-sm font-medium text-red-300">
           {state.error}
         </p>
-        <Link href="/login" className="text-sm text-mint underline underline-offset-4">
+        <Link href="/login" className="text-sm text-rose underline underline-offset-4">
           Tovább a belépéshez
         </Link>
       </div>

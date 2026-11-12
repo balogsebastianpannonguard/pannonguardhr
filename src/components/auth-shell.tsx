@@ -28,7 +28,7 @@ export function AuthShell({
 
       <section className="pg-rise relative z-10 flex flex-col justify-center border-white/8 bg-ink-900/80 px-6 py-12 backdrop-blur-xl sm:px-12 lg:border-r">
         <Brand size="lg" />
-        <p className="mt-14 text-xs font-semibold tracking-[0.22em] text-mint uppercase">{eyebrow}</p>
+        <p className="mt-14 text-xs font-semibold tracking-[0.22em] text-rose uppercase">{eyebrow}</p>
         <h1 className="mt-3 font-display text-4xl leading-tight font-semibold tracking-tight">
           {title}
           <br />
@@ -41,7 +41,7 @@ export function AuthShell({
       <aside className="relative hidden items-center justify-center p-12 lg:flex">
         <div className="w-full max-w-md space-y-4">
           <div className="pg-panel flex items-center gap-4 rounded-3xl p-6">
-            <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-mint/12 text-mint">
+            <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-rose/12 text-rose">
               <ShieldCheck size={24} aria-hidden />
             </span>
             <div>
@@ -57,7 +57,7 @@ export function AuthShell({
               className="pg-card pg-rise flex items-center gap-4 rounded-2xl p-5"
               style={{ animationDelay: `${0.15 + index * 0.1}s` }}
             >
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-leaf/20 text-leaf-bright">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-pink/20 text-pink-bright">
                 <Icon size={19} aria-hidden />
               </span>
               <div>

@@ -17,8 +17,8 @@ export function LoginForm({ notice }: { notice?: string }) {
     return (
       <form action={action} className="pg-rise space-y-5">
         <input type="hidden" name="intent" value="code" />
-        <div className="flex items-center gap-3 rounded-2xl border border-mint/25 bg-mint/8 p-4">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-mint/15 text-mint">
+        <div className="flex items-center gap-3 rounded-2xl border border-rose/25 bg-rose/8 p-4">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-rose/15 text-rose">
             <Smartphone size={19} aria-hidden />
           </span>
           <p className="text-sm text-white/75">
@@ -49,7 +49,7 @@ export function LoginForm({ notice }: { notice?: string }) {
     <form action={action} className="space-y-5">
       <input type="hidden" name="intent" value="password" />
       {notice && !state.error && (
-        <p className="rounded-xl border border-mint/20 bg-mint/8 px-4 py-3 text-sm text-mint-bright">
+        <p className="rounded-xl border border-rose/20 bg-rose/8 px-4 py-3 text-sm text-rose-bright">
           {notice}
         </p>
       )}
