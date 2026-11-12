@@ -3,12 +3,51 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ShieldCheck, type LucideIcon } from "lucide-react";
+import {
+  BarChart3,
+  BriefcaseBusiness,
+  CalendarOff,
+  FileText,
+  GraduationCap,
+  LayoutDashboard,
+  MailOpen,
+  Scale,
+  ShieldCheck,
+  TimerReset,
+  UserRoundCheck,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 
 type NavGroup = { title: string; links: { href: string; label: string; icon: LucideIcon }[] };
 
 const GROUPS: NavGroup[] = [
   { title: "Munka", links: [{ href: "/", label: "Áttekintés", icon: LayoutDashboard }] },
+  {
+    title: "Állomány",
+    links: [
+      { href: "/munkavallalok", label: "Munkavállalók", icon: Users },
+      { href: "/lejaratok", label: "Lejáratok", icon: TimerReset },
+      { href: "/tavollet", label: "Távollétek", icon: CalendarOff },
+    ],
+  },
+  {
+    title: "Munkaügy",
+    links: [
+      { href: "/be-kilepes", label: "Belépés és kilépés", icon: UserRoundCheck },
+      { href: "/dokumentumok", label: "HR-dokumentumok", icon: FileText },
+      { href: "/toborzas", label: "Toborzás", icon: BriefcaseBusiness },
+      { href: "/kepzesek", label: "Képzések", icon: GraduationCap },
+    ],
+  },
+  {
+    title: "Tudás és riport",
+    links: [
+      { href: "/kimutatasok", label: "Kimutatások", icon: BarChart3 },
+      { href: "/jog", label: "Jog és szabályzat", icon: Scale },
+      { href: "/kommunikacio", label: "Kommunikáció", icon: MailOpen },
+    ],
+  },
   { title: "Fiók", links: [{ href: "/biztonsag", label: "Biztonság", icon: ShieldCheck }] },
 ];
 
