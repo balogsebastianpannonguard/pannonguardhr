@@ -1,5 +1,6 @@
 import "server-only";
 import { ObjectId, type Filter } from "mongodb";
+import type { AppsheetView } from "@/lib/appsheet-meta";
 import { openData, sealData } from "@/lib/data-box";
 import { addDays, dayKey } from "@/lib/dates";
 import { expiriesOf, type EmployeeSecret, type EmployeeStatus, type EmploymentType, type ExitReason, type Qualification } from "@/lib/employee-meta";
@@ -10,9 +11,32 @@ export * from "@/lib/employee-meta";
 
 /* ---------- Adatmodell ---------- */
 
+/** Az AppSheet-nyilvántartásból betöltött eredeti adatlap (minden cella betűre pontosan). */
+export type AppsheetData = {
+  /** Az AppSheet sorazonosítója (a „History” első tagja), ez alapján frissül a munkatárs újabb betöltéskor. */
+  key: string;
+  /** Kulcsolt lenyomat (név, születési idő, cég, belépés) – tartalék egyeztetéshez, visszafejthetetlen. */
+  identity: string;
+  row: number;
+  /** A teljes eredeti sor SHA-256 lenyomata (változásfigyeléshez). */
+  hash: string;
+  /** A nem bizalmas cellák (oszlopazonosító → eredeti érték); az üres cellák nincsenek benne. */
+  plain: Record<string, string>;
+  /** A bizalmas és az ismeretlen oszlopok cellái titkosítva (data-box). */
+  secret?: string;
+  /** Ellenőrzésre jelölt adathibák (a bizalmas értékek nélkül). */
+  issues: string[];
+  importId: ObjectId;
+  importedAt: Date;
+  file: string;
+  missing?: boolean;
+};
+
 export type EmployeeDocument = {
   _id: ObjectId;
   name: string;
+  /** Munkáltató cég (pl. „Pannon Guard Zrt.”, „Zornig Team Kft.”). */
+  company?: string;
   email?: string;
   phone?: string;
   /** Munkakör, pl. „Vagyonőr”, „Objektumvezető”. */
@@ -43,6 +67,7 @@ export type EmployeeDocument = {
   notes?: string;
   /** Titkosított EmployeeSecret (data-box). */
   secret?: string;
+  appsheet?: AppsheetData;
   createdAt: Date;
   updatedAt: Date;
   createdBy: string;
@@ -50,7 +75,7 @@ export type EmployeeDocument = {
 };
 
 /** A felületnek átadható alak: string azonosító, a bizalmas adatok csak kifejezett kérésre. */
-export type Employee = Omit<EmployeeDocument, "_id" | "secret"> & { id: string };
+export type Employee = Omit<EmployeeDocument, "_id" | "secret" | "appsheet"> & { id: string; appsheet?: AppsheetView };
 
 export const employees = async () => (await getDb()).collection<EmployeeDocument>("employees");
 
@@ -63,13 +88,32 @@ async function ensureIndexes() {
     collection.createIndex({ position: 1 }),
     collection.createIndex({ department: 1 }),
     collection.createIndex({ email: 1 }, { sparse: true }),
+    collection.createIndex({ company: 1 }),
+    collection.createIndex({ "appsheet.key": 1 }, { sparse: true }),
+    collection.createIndex({ "appsheet.importId": 1, "appsheet.row": 1 }, { sparse: true }),
   ]);
   indexed = true;
 }
 
-export function toEmployee({ _id, secret: _secret, ...rest }: EmployeeDocument): Employee {
+export function toEmployee({ _id, secret: _secret, appsheet, ...rest }: EmployeeDocument): Employee {
   void _secret;
-  return { ...rest, id: String(_id), qualifications: rest.qualifications ?? [] };
+  return {
+    ...rest,
+    id: String(_id),
+    qualifications: rest.qualifications ?? [],
+    ...(appsheet && {
+      appsheet: {
+        key: appsheet.key,
+        row: appsheet.row,
+        plain: appsheet.plain ?? {},
+        hasSecret: Boolean(appsheet.secret),
+        issues: appsheet.issues ?? [],
+        importedAt: appsheet.importedAt,
+        file: appsheet.file,
+        missing: appsheet.missing,
+      },
+    }),
+  };
 }
 
 export function readSecret(doc: Pick<EmployeeDocument, "secret">): EmployeeSecret {
@@ -83,21 +127,24 @@ export function sealSecret(secret: EmployeeSecret) {
 
 export const parseId = (id: string) => (ObjectId.isValid(id) && /^[0-9a-f]{24}$/i.test(id) ? new ObjectId(id) : null);
 
-export type EmployeeQuery = { q?: string; status?: EmployeeStatus | "all"; position?: string; department?: string };
+export type EmployeeQuery = { q?: string; status?: EmployeeStatus | "all"; position?: string; department?: string; company?: string; issues?: boolean; missingDocs?: boolean };
 
 /** Keresés névre, e-mailre, munkakörre, egységre; alapból csak a nem kilépett dolgozók. */
-export async function listEmployees({ q, status, position, department }: EmployeeQuery = {}) {
+export async function listEmployees({ q, status, position, department, company, issues, missingDocs }: EmployeeQuery = {}) {
   await ensureIndexes();
   const filter: Filter<EmployeeDocument> = {};
   if (!status) filter.status = { $ne: "kilepett" };
   else if (status !== "all") filter.status = status;
   if (position) filter.position = position;
   if (department) filter.department = department;
+  if (company) filter.company = company;
+  if (issues) filter["appsheet.issues.0"] = { $exists: true };
+  if (missingDocs) filter["appsheet.plain.hianyzoDokumentumok"] = { $exists: true };
   if (q?.trim()) {
     const pattern = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-    filter.$or = [{ name: pattern }, { email: pattern }, { phone: pattern }, { position: pattern }, { department: pattern }, { "qualifications.name": pattern }];
+    filter.$or = [{ name: pattern }, { email: pattern }, { phone: pattern }, { position: pattern }, { department: pattern }, { company: pattern }, { guardLicenseNumber: pattern }, { "qualifications.name": pattern }, { "appsheet.plain.feor": pattern }];
   }
-  const docs = await (await employees()).find(filter, { projection: { secret: 0 } }).sort({ name: 1 }).limit(2000).toArray();
+  const docs = await (await employees()).find(filter, { projection: { secret: 0, "appsheet.secret": 0 } }).sort({ name: 1 }).limit(2000).toArray();
   return docs.map(toEmployee);
 }
 
@@ -119,8 +166,9 @@ export async function employeeOptions(includeExited = false) {
 /** A meglévő munkakörök és egységek (szűrőkhöz, javaslatokhoz). */
 export async function employeeFacets() {
   const collection = await employees();
-  const [positions, departments] = await Promise.all([collection.distinct("position"), collection.distinct("department")]);
+  const [positions, departments, companies] = await Promise.all([collection.distinct("position"), collection.distinct("department"), collection.distinct("company")]);
   return {
+    companies: (companies.filter(Boolean) as string[]).sort((a, b) => a.localeCompare(b, "hu")),
     positions: positions.filter(Boolean).sort((a, b) => a.localeCompare(b, "hu")),
     departments: (departments.filter(Boolean) as string[]).sort((a, b) => a.localeCompare(b, "hu")),
   };

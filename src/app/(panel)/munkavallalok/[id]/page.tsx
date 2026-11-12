@@ -4,6 +4,9 @@ import { notFound } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 import {
   ArrowLeft,
+  CircleAlert,
+  DatabaseZap,
+  FileWarning,
   FileText,
   GraduationCap,
   UserRoundCheck,
@@ -21,6 +24,7 @@ import {
   TimerReset,
   UserRound,
 } from "lucide-react";
+import { AppsheetRecord } from "@/components/appsheet-record";
 import { EmployeeDeleteForm, EmployeeExitForm } from "@/components/employee-actions";
 import { ExpiryList } from "@/components/employee-expiry-list";
 import { EmployeeQualifications } from "@/components/employee-qualifications";
@@ -42,13 +46,13 @@ import {
 import { recentChanges } from "@/lib/hr-log";
 import { requireUser } from "@/lib/session";
 
-export const metadata: Metadata = { title: "Munkavállaló" };
+export const metadata: Metadata = { title: "Munkatárs" };
 
 export default function EmployeePage({ params, searchParams }: PageProps<"/munkavallalok/[id]">) {
   return (
     <div className="space-y-8">
       <Link href="/munkavallalok" className="inline-flex items-center gap-1.5 text-sm text-white/55 hover:text-white">
-        <ArrowLeft size={15} aria-hidden /> Munkavállalók
+        <ArrowLeft size={15} aria-hidden /> Munkatársak
       </Link>
       <Suspense fallback={<Skeleton className="h-[40rem]" />}>
         <Detail params={params} searchParams={searchParams} />
@@ -61,6 +65,7 @@ const ACTIONS: Record<string, string> = {
   "employee.create": "Felvéve",
   "employee.update": "Adatok módosítva",
   "employee.import": "Importálva",
+  "employee.appsheet.view": "AppSheet-adatlap bizalmas adatai megtekintve",
   "employee.exit": "Kilépés",
   "employee.secret.view": "Bizalmas adatok megtekintése",
   "employee.secret.update": "Bizalmas adatok módosítása",
@@ -78,6 +83,7 @@ async function Detail({ params, searchParams }: Pick<PageProps<"/munkavallalok/[
   const today = dayKey(new Date());
   const expiries = expiriesOf(employee, today);
   const exited = employee.status === "kilepett";
+  const missingDocs = employee.appsheet?.plain.hianyzoDokumentumok?.trim();
   const notice = query.uj === "1" ? "A munkavállalót felvettem." : query.mentve === "1" ? "A változásokat mentettem." : undefined;
 
   const dated = (date?: string, watch = true) => {
@@ -100,7 +106,7 @@ async function Detail({ params, searchParams }: Pick<PageProps<"/munkavallalok/[
       )}
 
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <PageTitle eyebrow={[employee.position, employee.department].filter(Boolean).join(" · ")} title={employee.name}>
+        <PageTitle eyebrow={[employee.company, employee.position, employee.department].filter(Boolean).join(" · ")} title={employee.name}>
           <span className="flex flex-wrap items-center gap-2">
             <Pill tone={EMPLOYEE_STATUS_TONE[employee.status]}>{EMPLOYEE_STATUS[employee.status]}</Pill>
             <Pill tone="muted">{EMPLOYMENT_TYPES[employee.employmentType]}</Pill>
@@ -132,12 +138,46 @@ async function Detail({ params, searchParams }: Pick<PageProps<"/munkavallalok/[
         </div>
       </div>
 
+      {(missingDocs || (employee.appsheet?.issues.length ?? 0) > 0 || employee.appsheet?.missing) && (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {missingDocs && (
+            <div className="flex items-start gap-3 rounded-2xl border border-amber-300/25 bg-amber-400/8 p-4 text-sm text-amber-100">
+              <FileWarning size={18} aria-hidden className="mt-0.5 shrink-0" />
+              <div>
+                <p className="font-semibold">Hiányzó dokumentumok</p>
+                <p className="mt-0.5 whitespace-pre-wrap text-amber-100/85">{missingDocs}</p>
+              </div>
+            </div>
+          )}
+          {(employee.appsheet?.issues.length ?? 0) > 0 && (
+            <div className="flex items-start gap-3 rounded-2xl border border-red-400/25 bg-red-500/8 p-4 text-sm text-red-100">
+              <CircleAlert size={18} aria-hidden className="mt-0.5 shrink-0" />
+              <div>
+                <p className="font-semibold">Ellenőrizendő az AppSheet-ben</p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-4 text-red-100/85">
+                  {employee.appsheet!.issues.map((issue) => (
+                    <li key={issue}>{issue}</li>
+                  ))}
+                </ul>
+                <p className="mt-1.5 text-xs text-red-100/60">Az adatot nem módosítottam – pontosan úgy szerepel, ahogy az exportban volt.</p>
+              </div>
+            </div>
+          )}
+          {employee.appsheet?.missing && (
+            <p className="rounded-2xl border border-white/10 bg-white/4 p-4 text-sm text-white/65">
+              Ez a munkatárs a legutóbbi AppSheet-exportban már nem szerepelt. Ha kilépett, rögzítsd a kilépését.
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0 space-y-6">
           <Panel title="Alapadatok" icon={UserRound}>
             <Facts
               rows={[
                 ["Név", employee.name],
+                ["Cég", employee.company],
                 ["E-mail", employee.email],
                 ["Telefon", employee.phone],
                 ["Munkakör", employee.position],
@@ -185,6 +225,12 @@ async function Detail({ params, searchParams }: Pick<PageProps<"/munkavallalok/[
           <Panel title="Bér és személyes adatok" icon={LockKeyhole}>
             <EmployeeSecretPanel employeeId={employee.id} hasSecret={hasSecret} />
           </Panel>
+
+          {employee.appsheet && (
+            <Panel title="AppSheet-adatlap – minden adat, eredeti formában" icon={DatabaseZap}>
+              <AppsheetRecord employeeId={employee.id} record={employee.appsheet} />
+            </Panel>
+          )}
         </div>
 
         <div className="min-w-0 space-y-6">

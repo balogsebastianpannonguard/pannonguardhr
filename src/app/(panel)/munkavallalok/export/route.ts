@@ -17,6 +17,9 @@ export async function GET(request: Request) {
     status: status === "all" ? "all" : isStatus(status) ? status : undefined,
     position: params.get("position") || undefined,
     department: params.get("department") || undefined,
+    company: params.get("company") || undefined,
+    issues: params.get("ellenorizendo") === "1",
+    missingDocs: params.get("hianyzo") === "1",
   };
   const list = await listEmployees(query);
   await logChange(user, "employee.export", "employee", `CSV-export: ${list.length} munkavállaló`);

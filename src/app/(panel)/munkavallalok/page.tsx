@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { CircleCheck, Download, FileUp, Search, SearchX, UserRoundPlus, Users } from "lucide-react";
+import { CircleAlert, CircleCheck, DatabaseZap, Download, FileUp, FileWarning, Search, SearchX, UserRoundPlus, Users } from "lucide-react";
 import { PageTitle } from "@/components/page-title";
 import { Empty, Input, Pill, Select, Skeleton, buttonClass } from "@/components/ui";
 import { dayKey } from "@/lib/dates";
@@ -24,16 +24,20 @@ import {
 } from "@/lib/employees";
 import { requireUser } from "@/lib/session";
 
-export const metadata: Metadata = { title: "Munkavállalók" };
+export const metadata: Metadata = { title: "Munkatársak" };
 
 export default function EmployeesPage({ searchParams }: PageProps<"/munkavallalok">) {
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <PageTitle eyebrow="Állomány" title="Munkavállalók" accent="nyilvántartása.">
-          Törzsadatok, munkaviszony, végzettségek és lejáratok egy helyen. Keress névre, munkakörre, objektumra vagy képesítésre.
+        <PageTitle eyebrow="Állomány" title="Munkatársak" accent="nyilvántartása.">
+          Mindenki, minden adatával: törzsadatok, munkaviszony, igazolványok, alkalmasság és lejáratok egy helyen. Keress névre,
+          cégre, munkakörre, objektumra vagy igazolványszámra.
         </PageTitle>
         <div className="flex flex-wrap gap-2">
+          <Link href="/munkavallalok/appsheet" className={buttonClass("secondary")}>
+            <DatabaseZap size={16} aria-hidden /> AppSheet-betöltés
+          </Link>
           <Link href="/munkavallalok/import" className={buttonClass("secondary")}>
             <FileUp size={16} aria-hidden /> Import
           </Link>
@@ -58,16 +62,22 @@ async function Employees({ searchParams }: Pick<PageProps<"/munkavallalok">, "se
     status: one(params.status),
     position: one(params.position),
     department: one(params.department),
+    company: one(params.company),
+    ellenorizendo: one(params.ellenorizendo) === "1" ? "1" : "",
+    hianyzo: one(params.hianyzo) === "1" ? "1" : "",
   };
   const query: EmployeeQuery = {
     q: filter.q || undefined,
     status: filter.status === "all" ? "all" : isStatus(filter.status) ? filter.status : undefined,
     position: filter.position || undefined,
     department: filter.department || undefined,
+    company: filter.company || undefined,
+    issues: filter.ellenorizendo === "1",
+    missingDocs: filter.hianyzo === "1",
   };
   const [list, counts, facets] = await Promise.all([listEmployees(query), employeeStatusCounts(), employeeFacets()]);
   const today = dayKey(new Date());
-  const filtered = Boolean(filter.q || filter.status || filter.position || filter.department);
+  const filtered = Boolean(filter.q || filter.status || filter.position || filter.department || filter.company || filter.ellenorizendo || filter.hianyzo);
 
   const href = (changes: Record<string, string>) => {
     const next = new URLSearchParams(Object.entries({ ...filter, ...changes }).filter(([, value]) => value));
@@ -87,9 +97,32 @@ async function Employees({ searchParams }: Pick<PageProps<"/munkavallalok">, "se
     <div className="space-y-5">
       {params.torolve === "1" && (
         <p className="pg-rise flex items-center gap-2 rounded-2xl border border-emerald-300/20 bg-emerald-400/8 px-4 py-3 text-sm text-emerald-100">
-          <CircleCheck size={16} aria-hidden /> A munkavállaló adatait véglegesen töröltem.
+          <CircleCheck size={16} aria-hidden /> A munkatárs adatait véglegesen töröltem.
         </p>
       )}
+
+      <nav aria-label="Cég és adatállapot szerinti szűrés" className="flex flex-wrap gap-2">
+        {[
+          ...facets.companies.map((company) => ({ key: "company", value: company, label: company, icon: undefined })),
+          { key: "hianyzo", value: "1", label: "Hiányzó dokumentummal", icon: FileWarning },
+          { key: "ellenorizendo", value: "1", label: "Ellenőrizendő adattal", icon: CircleAlert },
+        ].map(({ key, value, label, icon: Icon }) => {
+          const active = filter[key as keyof typeof filter] === value;
+          return (
+            <Link
+              key={`${key}-${value}`}
+              href={href({ [key]: active ? "" : value })}
+              aria-current={active ? "page" : undefined}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs transition ${
+                active ? "bg-pink/25 font-semibold text-pink-bright ring-1 ring-pink-bright/40" : "bg-white/4 text-white/55 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              {Icon && <Icon size={13} aria-hidden />}
+              {label}
+            </Link>
+          );
+        })}
+      </nav>
 
       <nav aria-label="Állapot szerinti szűrés" className="flex flex-wrap gap-2">
         {chips.map((chip) => {
@@ -112,9 +145,12 @@ async function Employees({ searchParams }: Pick<PageProps<"/munkavallalok">, "se
 
       <form method="get" className="pg-panel grid gap-3 rounded-2xl p-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
         {filter.status && <input type="hidden" name="status" value={filter.status} />}
+        {filter.company && <input type="hidden" name="company" value={filter.company} />}
+        {filter.hianyzo && <input type="hidden" name="hianyzo" value="1" />}
+        {filter.ellenorizendo && <input type="hidden" name="ellenorizendo" value="1" />}
         <label className="sm:col-span-2 lg:col-span-1">
           <span className="mb-1 block text-xs text-white/50">Keresés</span>
-          <Input name="q" type="search" defaultValue={filter.q} placeholder="Név, e-mail, telefon, munkakör, képesítés…" />
+          <Input name="q" type="search" defaultValue={filter.q} placeholder="Név, e-mail, telefon, cég, munkakör, igazolványszám…" />
         </label>
         <label>
           <span className="mb-1 block text-xs text-white/50">Munkakör</span>
@@ -152,7 +188,8 @@ async function Employees({ searchParams }: Pick<PageProps<"/munkavallalok">, "se
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-white/55">
-          <span className="font-semibold text-white tabular-nums">{list.length}</span> munkavállaló
+          <span className="font-semibold text-white tabular-nums">{list.length}</span> munkatárs
+          {filter.company && ` · ${filter.company}`}
           {filter.status && isStatus(filter.status) ? ` · ${EMPLOYEE_STATUS[filter.status]}` : filter.status === "all" ? " · kilépettekkel együtt" : ""}
         </p>
         <a href={`/munkavallalok/export${exportQuery ? `?${exportQuery}` : ""}`} className={buttonClass("ghost", "sm")} download>
@@ -163,12 +200,15 @@ async function Employees({ searchParams }: Pick<PageProps<"/munkavallalok">, "se
       {list.length === 0 ? (
         <Empty
           icon={filtered ? SearchX : Users}
-          title={filtered ? "Nincs találat" : "Még nincs munkavállaló a nyilvántartásban"}
-          text={filtered ? "Próbálj más keresőszót vagy szűrést." : "Vedd fel az első kollégát, vagy töltsd be a meglévő Excel-táblázatodat CSV-importtal."}
+          title={filtered ? "Nincs találat" : "Még nincs munkatárs a nyilvántartásban"}
+          text={filtered ? "Próbálj más keresőszót vagy szűrést." : "Töltsd be az AppSheet-exportot, vegyél fel kollégát kézzel, vagy importálj Excel-táblázatot."}
           action={
             !filtered && (
               <div className="flex flex-wrap justify-center gap-2">
-                <Link href="/munkavallalok/uj" className={buttonClass("primary")}>
+                <Link href="/munkavallalok/appsheet" className={buttonClass("primary")}>
+                  <DatabaseZap size={16} aria-hidden /> AppSheet-betöltés
+                </Link>
+                <Link href="/munkavallalok/uj" className={buttonClass("secondary")}>
                   <UserRoundPlus size={17} aria-hidden /> Új munkavállaló
                 </Link>
                 <Link href="/munkavallalok/import" className={buttonClass("secondary")}>
@@ -199,11 +239,8 @@ async function Employees({ searchParams }: Pick<PageProps<"/munkavallalok">, "se
                       <Link href={`/munkavallalok/${employee.id}`} className="block truncate font-medium hover:text-rose-bright">
                         {employee.name}
                       </Link>
-                      {employee.status !== "aktiv" && (
-                        <span className="mt-0.5 block">
-                          <Pill tone={EMPLOYEE_STATUS_TONE[employee.status]}>{EMPLOYEE_STATUS_SHORT[employee.status]}</Pill>
-                        </span>
-                      )}
+                      {employee.company && <span className="block truncate text-xs text-white/40">{employee.company}</span>}
+                      <Flags employee={employee} />
                     </td>
                     <td className="truncate px-3 py-2.5 text-white/75">{employee.position}</td>
                     <td className="truncate px-3 py-2.5 text-white/60">{employee.department ?? "–"}</td>
@@ -224,8 +261,9 @@ async function Employees({ searchParams }: Pick<PageProps<"/munkavallalok">, "se
                 <Link href={`/munkavallalok/${employee.id}`} className="pg-card block rounded-2xl p-4 transition hover:bg-white/5">
                   <div className="flex items-start justify-between gap-3">
                     <p className="min-w-0 truncate font-semibold">{employee.name}</p>
-                    {employee.status !== "aktiv" && <Pill tone={EMPLOYEE_STATUS_TONE[employee.status]}>{EMPLOYEE_STATUS_SHORT[employee.status]}</Pill>}
                   </div>
+                  {employee.company && <p className="truncate text-xs text-white/40">{employee.company}</p>}
+                  <Flags employee={employee} />
                   <p className="mt-0.5 truncate text-sm text-white/60">{[employee.position, employee.department].filter(Boolean).join(" · ")}</p>
                   <p className="mt-0.5 truncate text-xs text-white/40">
                     {EMPLOYMENT_TYPES[employee.employmentType]}
@@ -241,6 +279,32 @@ async function Employees({ searchParams }: Pick<PageProps<"/munkavallalok">, "se
         </>
       )}
     </div>
+  );
+}
+
+function Flags({ employee }: { employee: Employee }) {
+  const missingDocs = employee.appsheet?.plain.hianyzoDokumentumok?.trim();
+  const issues = employee.appsheet?.issues.length ?? 0;
+  if (employee.status === "aktiv" && !missingDocs && !issues && !employee.appsheet?.missing) return null;
+  return (
+    <span className="mt-1 flex flex-wrap gap-1">
+      {employee.status !== "aktiv" && <Pill tone={EMPLOYEE_STATUS_TONE[employee.status]}>{EMPLOYEE_STATUS_SHORT[employee.status]}</Pill>}
+      {missingDocs && (
+        <span title={`Hiányzó dokumentumok: ${missingDocs}`}>
+          <Pill tone="warning" icon={FileWarning}>
+            Hiányzó dok.
+          </Pill>
+        </span>
+      )}
+      {issues > 0 && (
+        <span title="Ellenőrizendő adat az AppSheet-adatlapon">
+          <Pill tone="error" icon={CircleAlert}>
+            {issues} ellenőrizendő
+          </Pill>
+        </span>
+      )}
+      {employee.appsheet?.missing && <Pill tone="muted">Nincs a legutóbbi AppSheet-exportban</Pill>}
+    </span>
   );
 }
 

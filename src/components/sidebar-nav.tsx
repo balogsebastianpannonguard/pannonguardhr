@@ -26,7 +26,7 @@ const GROUPS: NavGroup[] = [
   {
     title: "Állomány",
     links: [
-      { href: "/munkavallalok", label: "Munkavállalók", icon: Users },
+      { href: "/munkavallalok", label: "Munkatársak", icon: Users },
       { href: "/lejaratok", label: "Lejáratok", icon: TimerReset },
       { href: "/tavollet", label: "Távollétek", icon: CalendarOff },
     ],
