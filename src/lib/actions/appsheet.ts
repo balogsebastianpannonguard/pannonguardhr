@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { commitAppsheet, openAppsheetSecret, previewAppsheet, readAppsheetFile, type AppsheetSummary } from "@/lib/appsheet";
+import { commitAppsheet, openAppsheetSecret, previewAppsheet, readAppsheetFile, saveAppsheetEdits, type AppsheetSummary } from "@/lib/appsheet";
 import { employees, parseId } from "@/lib/employees";
 import { logChange } from "@/lib/hr-log";
 import { requireUser } from "@/lib/session";
@@ -46,4 +46,21 @@ export async function revealAppsheetSecret(id: string): Promise<{ values?: Recor
   } catch {
     return { error: "A bizalmas adatok nem fejthetők vissza (titkosítási kulcs hiba). Szólj a rendszergazdának." };
   }
+}
+
+/** Az AppSheet-adatlap szerkesztése: az űrlap összes mezője egyszerre mentődik; az eredmény a módosított oszlopok és az újraszámolt adatellenőrzés. */
+export async function saveAppsheetRecord(id: string, values: Record<string, string>): Promise<{ ok?: boolean; error?: string; changed?: string[]; issues?: string[] }> {
+  const user = await requireUser();
+  const _id = parseId(id);
+  if (!_id) return { error: "Ismeretlen munkatárs." };
+  if (typeof values !== "object" || values === null || Object.keys(values).length > 200) return { error: "Hibás adatok." };
+  const clean: Record<string, string> = {};
+  for (const [key, value] of Object.entries(values)) if (typeof value === "string") clean[key] = value;
+  const result = await saveAppsheetEdits(user, _id, clean);
+  if ("error" in result) return { error: result.error };
+  revalidatePath(`/munkavallalok/${id}`);
+  revalidatePath("/munkavallalok");
+  revalidatePath("/lejaratok");
+  revalidatePath("/");
+  return { ok: true, changed: result.changed, issues: result.issues };
 }

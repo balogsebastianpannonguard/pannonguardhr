@@ -23,6 +23,7 @@ import {
 } from "@/lib/employees";
 import { DAY, EMAIL, longText, num, optional, text, type FormState } from "@/lib/form";
 import { eraseEmployeeRecords } from "@/lib/erasure";
+import { appsheetMirrorSecret, appsheetMirrorUpdate } from "@/lib/appsheet";
 import { logChange } from "@/lib/hr-log";
 import { requireUser } from "@/lib/session";
 
@@ -194,7 +195,7 @@ export async function updateEmployee(_previous: FormState, formData: FormData): 
   const { fields, error } = readFields(formData);
   if (!fields) return { error };
   const collection = await employees();
-  const current = await collection.findOne({ _id }, { projection: { status: 1 } });
+  const current = await collection.findOne({ _id }, { projection: { status: 1, "appsheet.key": 1 } });
   if (!current) return { error: "A munkavállaló nem található." };
   if (await duplicateOf(fields, _id)) return { error: "Ezzel az e-mail-címmel már van másik munkavállaló." };
 
@@ -202,11 +203,14 @@ export async function updateEmployee(_previous: FormState, formData: FormData): 
   // Ha a kilépett dolgozót visszaállítják, a kilépés adatai törlődnek.
   if (current.status === "kilepett" && fields.status !== "kilepett") cleared.push("exitDate", "exitReason");
   const filled = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));
+  // Az AppSheet-adatlap megfelelő celláit is frissítjük, hogy a két nézet ne térjen el.
+  const mirror = current.appsheet?.key ? appsheetMirrorUpdate(fields) : { set: {}, unset: {} };
+  const unsetAll: Record<string, ""> = { ...(Object.fromEntries(cleared.map((key) => [key, ""])) as Record<string, "">), ...mirror.unset };
   await collection.updateOne(
     { _id },
     {
-      $set: { ...filled, updatedAt: new Date(), updatedBy: user.id },
-      ...(cleared.length && { $unset: Object.fromEntries(cleared.map((key) => [key, ""])) }),
+      $set: { ...filled, ...mirror.set, updatedAt: new Date(), updatedBy: user.id },
+      ...(Object.keys(unsetAll).length && { $unset: unsetAll }),
     },
   );
   const statusNote = current.status !== fields.status ? `; állapot: ${EMPLOYEE_STATUS[current.status]} → ${EMPLOYEE_STATUS[fields.status]}` : "";
@@ -239,12 +243,17 @@ export async function saveEmployeeSecret(_previous: FormState, formData: FormDat
   const { secret, error } = readSecretFields(formData);
   if (!secret) return { error };
   const sealed = sealSecret(secret);
-  const result = await (await employees()).updateOne(
-    { _id },
-    sealed
-      ? { $set: { secret: sealed, updatedAt: new Date(), updatedBy: user.id } }
-      : { $unset: { secret: "" }, $set: { updatedAt: new Date(), updatedBy: user.id } },
-  );
+  const collection = await employees();
+  // Az AppSheet-adatlap titkosított celláit is frissítjük (ha van), hogy a két nézet ne térjen el.
+  const linked = await collection.findOne({ _id }, { projection: { "appsheet.key": 1, "appsheet.secret": 1 } });
+  const mirrored = linked?.appsheet?.key ? appsheetMirrorSecret(linked.appsheet.secret, secret) : undefined;
+  const set: Record<string, unknown> = { updatedAt: new Date(), updatedBy: user.id };
+  const unset: Record<string, ""> = {};
+  if (sealed) set.secret = sealed;
+  else unset.secret = "";
+  if (mirrored) set["appsheet.secret"] = mirrored;
+  else if (mirrored === null) unset["appsheet.secret"] = "";
+  const result = await collection.updateOne({ _id }, { $set: set, ...(Object.keys(unset).length ? { $unset: unset } : {}) });
   if (!result.matchedCount) return { error: "A munkavállaló nem található." };
   await logChange(user, "employee.secret.update", "employee", "Bér és személyes adatok módosítva", id);
   revalidatePath(`/munkavallalok/${id}`);

@@ -112,7 +112,7 @@ const taxBirthMatches = (d: string, birth: string) => Number(d.slice(1, 6)) === 
 type Values = Record<string, string>;
 
 /** Soronkénti adatellenőrzés. Az üzenetek soha nem tartalmazzák magát a bizalmas értéket. */
-function rowIssues(v: Values): string[] {
+export function rowIssues(v: Values): string[] {
   const issues: string[] = [];
   const birth = appsheetDate(v.szuletesiIdo ?? "");
 
@@ -274,7 +274,7 @@ export function readAppsheetFile(bytes: Uint8Array): { file?: AppsheetFile; erro
 }
 
 /** Az AppSheet-sorból a HR-rendszer saját mezői. */
-function derive(v: Values, today: string) {
+export function derive(v: Values, today: string) {
   const trim = (id: string) => (v[id] ?? "").trim() || undefined;
   const startDate = appsheetDate(v.belepes ?? "") ?? undefined;
   const exitDate = appsheetDate(v.kilepesDatuma ?? "") ?? undefined;
@@ -616,4 +616,159 @@ export async function appsheetCsv() {
   const docs = await (await employees()).find({ "appsheet.importId": last._id }, { projection: { appsheet: 1 } }).sort({ "appsheet.row": 1 }).toArray();
   const rows = docs.map((doc) => cellsFromStored(doc.appsheet!, last.headers));
   return { name: last.file, rows: rows.length, text: serializeExact(last.headers, rows, last.format) };
+}
+
+/* ---------- Kézi szerkesztés ---------- */
+
+/** Az AppSheet-sorazonosítót tartalmazó „History” oszlop nem szerkeszthető (ez alapján azonosítjuk a sort egy későbbi betöltéskor). */
+export const APPSHEET_READONLY = new Set(["history"]);
+
+export type AppsheetEditResult = { ok: true; changed: string[]; issues: string[] } | { error: string };
+
+/**
+ * Egy munkatárs AppSheet-adatlapjának kézi módosítása. Minden oszlop szerkeszthető (a „History” kivételével); a HR-rendszer
+ * saját mezői (név, munkakör, lejáratok, bizalmas adatok…) ugyanúgy származnak belőle, mint a betöltéskor. Az adatellenőrzés
+ * újra lefut. Egy későbbi AppSheet-betöltés – az AppSheet az irányadó – felülírja a kézi módosítást.
+ */
+export async function saveAppsheetEdits(user: { id: string; name: string }, id: ObjectId, input: Record<string, string>): Promise<AppsheetEditResult> {
+  const collection = await employees();
+  const doc = await collection.findOne({ _id: id });
+  if (!doc?.appsheet) return { error: "Ehhez a munkatárshoz nincs AppSheet-adatlap." };
+  let hidden: Record<string, string>;
+  try {
+    hidden = openAppsheetSecret(doc.appsheet);
+  } catch {
+    return { error: "A bizalmas adatok nem fejthetők vissza (titkosítási kulcs hiba). Szólj a rendszergazdának." };
+  }
+
+  const plain: Record<string, string> = { ...doc.appsheet.plain };
+  const changed: string[] = [];
+  for (const column of APPSHEET_COLUMNS) {
+    if (APPSHEET_READONLY.has(column.id) || !(column.id in input)) continue;
+    const raw = String(input[column.id] ?? "").replace(/\r\n/g, "\n");
+    const value = column.multiline ? raw.replace(/^\s+|\s+$/g, "") : raw.trim();
+    if (value.length > (column.multiline ? 5000 : 500)) return { error: `„${column.header}”: túl hosszú érték.` };
+    if (column.date && value && !appsheetDate(value)) return { error: `„${column.header}”: nem értelmezhető dátum (írd így: ÉÉÉÉ-HH-NN).` };
+    const before = (column.secret ? hidden[column.id] : plain[column.id]) ?? "";
+    if (before === value) continue;
+    changed.push(column.header);
+    const target = column.secret ? hidden : plain;
+    if (value) target[column.id] = value;
+    else delete target[column.id];
+  }
+  if (!changed.length) return { ok: true, changed, issues: doc.appsheet.issues };
+
+  const values: Values = { ...plain };
+  for (const [key, value] of Object.entries(hidden)) if (!key.startsWith("x:")) values[key] = value;
+  const issues = rowIssues(values);
+
+  const now = new Date();
+  const today = dayKey(now);
+  const { fields, qualifications, secret } = derive(values, today);
+  const keepExit = doc.status === "kilepett" && fields.status !== "kilepett";
+  const derived = keepExit ? { ...fields, status: doc.status, exitDate: doc.exitDate } : fields;
+  const mergedSecret: EmployeeSecret = { ...readSecretSafe(doc), ...secret };
+  for (const key of Object.keys(secret) as (keyof EmployeeSecret)[]) if (secret[key] === undefined) delete mergedSecret[key];
+  const sealedSecret = sealSecret(mergedSecret);
+  const sealedHidden = Object.keys(hidden).length ? sealData(hidden) : undefined;
+  const unset: Record<string, ""> = Object.fromEntries([
+    ...Object.entries(derived).filter(([, value]) => value === undefined).map(([key]) => key),
+    ...(sealedSecret ? [] : ["secret"]),
+    ...(sealedHidden ? [] : ["appsheet.secret"]),
+  ].map((key) => [key, ""]));
+
+  await collection.updateOne(
+    { _id: id },
+    {
+      $set: {
+        ...strip(derived),
+        qualifications: [...(doc.qualifications ?? []).filter((item) => !item.id.startsWith("appsheet-")), ...qualifications],
+        ...(sealedSecret && { secret: sealedSecret }),
+        "appsheet.plain": plain,
+        ...(sealedHidden && { "appsheet.secret": sealedHidden }),
+        "appsheet.issues": issues,
+        // Új lenyomat: a kézzel módosított sor egy későbbi betöltésnél „változott sornak” számít.
+        "appsheet.hash": createHash("sha256").update(`manual:${id}:${now.toISOString()}`).digest("hex"),
+        updatedAt: now,
+        updatedBy: user.id,
+      },
+      ...(Object.keys(unset).length && { $unset: unset }),
+    },
+  );
+  await (await hrLog()).insertOne({
+    at: now,
+    by: user.id,
+    byName: user.name,
+    action: "employee.update",
+    entity: "employee",
+    entityId: String(id),
+    summary: `Adatlap módosítva: ${changed.slice(0, 12).join(", ")}${changed.length > 12 ? ` és még ${changed.length - 12}` : ""}`.slice(0, 300),
+  });
+  return { ok: true, changed, issues };
+}
+
+/* ---------- Tükrözés: az alap- és bizalmas adatok szerkesztése az AppSheet-adatlapra is átvezetődik ---------- */
+
+const MIRROR_PLAIN: Record<string, string> = {
+  email: "email",
+  phone: "telefon",
+  position: "munkakor",
+  department: "szervezetiEgyseg",
+  education: "vegzettseg",
+  guardLicenseNumber: "vagyonorIgazolvany",
+  notes: "megjegyzes",
+  startDate: "belepes",
+  exitDate: "kilepesDatuma",
+  medicalExpiry: "orvosi",
+};
+
+/**
+ * A HR-alapadatok űrlapján módosított értékek átvezetése az AppSheet-adatlap celláiba (ha van), hogy a két nézet ne térjen el.
+ * Visszaadja a Mongo-frissítés `$set` és `$unset` részét.
+ */
+export function appsheetMirrorUpdate(fields: Record<string, unknown>) {
+  const set: Record<string, string> = {};
+  const unset: Record<string, ""> = {};
+  for (const [field, column] of Object.entries(MIRROR_PLAIN)) {
+    if (!(field in fields)) continue;
+    const value = fields[field];
+    if (typeof value === "string" && value) set[`appsheet.plain.${column}`] = value;
+    else unset[`appsheet.plain.${column}`] = "";
+  }
+  const name = typeof fields.name === "string" ? fields.name.trim() : "";
+  if (name) {
+    const [first, ...rest] = name.split(/\s+/);
+    set["appsheet.plain.fullName"] = name;
+    set["appsheet.plain.vezeteknev"] = first;
+    if (rest.length) set["appsheet.plain.keresztnev"] = rest.join(" ");
+    else unset["appsheet.plain.keresztnev"] = "";
+  }
+  return { set, unset };
+}
+
+const MIRROR_SECRET: Record<string, string> = {
+  birthName: "szuletesiNev",
+  birthPlace: "szuletesiHely",
+  birthDate: "szuletesiIdo",
+  motherName: "anyjaNeve",
+  address: "lakohely",
+  taxId: "adoazonosito",
+  tajNumber: "taj",
+  bankAccount: "szamlaszam",
+};
+
+/** A bizalmas adatok űrlapján mentett értékek átvezetése az AppSheet-adatlap titkosított celláiba (ha van). */
+export function appsheetMirrorSecret(sealedHidden: string | undefined, secret: EmployeeSecret) {
+  let hidden: Record<string, string> = {};
+  try {
+    hidden = openAppsheetSecret({ secret: sealedHidden });
+  } catch {
+    return undefined;
+  }
+  for (const [field, column] of Object.entries(MIRROR_SECRET)) {
+    const value = secret[field as keyof EmployeeSecret];
+    if (typeof value === "string" && value) hidden[column] = value;
+    else delete hidden[column];
+  }
+  return Object.keys(hidden).length ? sealData(hidden) : null;
 }

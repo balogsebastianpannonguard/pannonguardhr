@@ -1,9 +1,10 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Eye, EyeOff, LoaderCircle, LockKeyhole } from "lucide-react";
-import { Feedback, buttonClass } from "@/components/ui";
-import { revealAppsheetSecret } from "@/lib/actions/appsheet";
+import { Eye, EyeOff, LoaderCircle, LockKeyhole, Pencil, Save, X } from "lucide-react";
+import { Feedback, Input, Textarea, buttonClass } from "@/components/ui";
+import { revealAppsheetSecret, saveAppsheetRecord } from "@/lib/actions/appsheet";
 import { APPSHEET_COLUMNS, APPSHEET_GROUPS, type AppsheetGroup, type AppsheetView } from "@/lib/appsheet-meta";
 
 const ORDER: AppsheetGroup[] = ["munkaviszony", "elerhetoseg", "szemelyes", "azonosito", "lakcim", "kepesites", "gyermek", "dokumentum", "appsheet"];
@@ -16,6 +17,39 @@ export function AppsheetRecord({ employeeId, record }: { employeeId: string; rec
   const [secret, setSecret] = useState<Record<string, string> | null>(null);
   const [error, setError] = useState<string>();
   const [loading, startLoading] = useTransition();
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [saving, startSaving] = useTransition();
+  const [saved, setSaved] = useState<string>();
+
+  /** Szerkesztés indítása: a bizalmas cellák is betöltődnek (a megtekintést a változásnapló rögzíti). */
+  function startEdit() {
+    setError(undefined);
+    setSaved(undefined);
+    startLoading(async () => {
+      const result = await revealAppsheetSecret(employeeId);
+      if (result.error) return setError(result.error);
+      const hidden = result.values ?? {};
+      setSecret(hidden);
+      const values: Record<string, string> = {};
+      for (const column of APPSHEET_COLUMNS) values[column.id] = (column.secret ? hidden[column.id] : record.plain[column.id]) ?? "";
+      setDraft(values);
+      setEditing(true);
+    });
+  }
+
+  function save() {
+    setError(undefined);
+    startSaving(async () => {
+      const result = await saveAppsheetRecord(employeeId, draft);
+      if (result.error) return setError(result.error);
+      setEditing(false);
+      setSecret(null);
+      setSaved(result.changed?.length ? `Mentve: ${result.changed.length} adat módosult.${result.issues?.length ? ` Ellenőrizendő: ${result.issues.length} tétel.` : ""}` : "Nem volt módosítás.");
+      router.refresh();
+    });
+  }
 
   function reveal() {
     setError(undefined);
@@ -34,7 +68,21 @@ export function AppsheetRecord({ employeeId, record }: { employeeId: string; rec
         <p className="text-xs text-white/45">
           Forrás: {record.file}, {record.row}. sor · AppSheet-azonosító: {record.key.startsWith("azon:") ? "nincs (név és születési adatok alapján egyeztetve)" : record.key}
         </p>
-        {record.hasSecret &&
+        {editing ? (
+          <span className="flex gap-2">
+            <button type="button" onClick={save} disabled={saving} className={buttonClass("primary", "sm")}>
+              {saving ? <LoaderCircle size={15} aria-hidden className="animate-spin" /> : <Save size={15} aria-hidden />} Mentés
+            </button>
+            <button type="button" onClick={() => { setEditing(false); setSecret(null); }} disabled={saving} className={buttonClass("ghost", "sm")}>
+              <X size={15} aria-hidden /> Mégsem
+            </button>
+          </span>
+        ) : (
+          <button type="button" onClick={startEdit} disabled={loading} className={buttonClass("secondary", "sm")}>
+            {loading ? <LoaderCircle size={15} aria-hidden className="animate-spin" /> : <Pencil size={15} aria-hidden />} Összes adat szerkesztése
+          </button>
+        )}
+        {!editing && record.hasSecret &&
           (secret ? (
             <button type="button" onClick={() => setSecret(null)} className={buttonClass("secondary", "sm")}>
               <EyeOff size={15} aria-hidden /> Bizalmas adatok elrejtése
@@ -45,7 +93,12 @@ export function AppsheetRecord({ employeeId, record }: { employeeId: string; rec
             </button>
           ))}
       </div>
-      <Feedback error={error} />
+      <Feedback error={error} message={saved} />
+      {editing && (
+        <p className="rounded-xl border border-amber-300/25 bg-amber-400/8 px-3.5 py-2.5 text-xs text-amber-100/90">
+          Minden mező szerkeszthető; a dátumokat ÉÉÉÉ-HH-NN alakban add meg. A név, a munkakör, a lejáratok és a bizalmas adatok ebből frissülnek. Ha később újra feltöltöd az AppSheet-exportot, az az itt végzett módosításokat felülírja.
+        </p>
+      )}
 
       {ORDER.map((group) => {
         const columns = APPSHEET_COLUMNS.filter((column) => column.group === group);
@@ -63,7 +116,19 @@ export function AppsheetRecord({ employeeId, record }: { employeeId: string; rec
                       {column.header}
                     </dt>
                     <dd className="font-medium whitespace-pre-wrap [overflow-wrap:anywhere]">
-                      {hidden ? <span className="tracking-widest text-white/30">••••••</span> : value ? value : <span className="text-white/25">–</span>}
+                      {editing && column.id !== "history" ? (
+                        column.multiline ? (
+                          <Textarea value={draft[column.id] ?? ""} onChange={(event) => setDraft({ ...draft, [column.id]: event.target.value })} rows={3} maxLength={5000} aria-label={column.header} />
+                        ) : (
+                          <Input value={draft[column.id] ?? ""} onChange={(event) => setDraft({ ...draft, [column.id]: event.target.value })} maxLength={500} placeholder={column.date ? "ÉÉÉÉ-HH-NN" : undefined} aria-label={column.header} />
+                        )
+                      ) : hidden ? (
+                        <span className="tracking-widest text-white/30">••••••</span>
+                      ) : value ? (
+                        value
+                      ) : (
+                        <span className="text-white/25">–</span>
+                      )}
                     </dd>
                   </div>
                 );
