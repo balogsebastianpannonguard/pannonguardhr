@@ -78,14 +78,20 @@ export async function register(
       });
       userId = inserted.insertedId;
     } catch (error) {
-      await undoRedeem(redeemed._id);
       const duplicate = (error as { code?: number }).code === 11000;
-      return {
-        error: duplicate
-          ? "Ezzel az e-mail-címmel már van fiók. Lépj be inkább."
-          : "A regisztráció átmenetileg nem érhető el.",
-        name,
-      };
+      const reclaimed = duplicate
+        ? await reclaimOrphanedUser(redeemed.email, redeemed._id, redeemed.invitedBy, name, passwordHash)
+        : null;
+      if (!reclaimed) {
+        await undoRedeem(redeemed._id);
+        return {
+          error: duplicate
+            ? "Ezzel az e-mail-címmel már van fiók. Lépj be inkább."
+            : "A regisztráció átmenetileg nem érhető el.",
+          name,
+        };
+      }
+      userId = reclaimed;
     }
 
     await recordAudit("register", redeemed.email, userId);
@@ -95,6 +101,35 @@ export async function register(
     return { error: "A regisztráció átmenetileg nem érhető el.", name };
   }
   redirect("/ketfaktor");
+}
+
+/**
+ * Ha a címhez régebbi fiók tartozik, amelynek a meghívóját az Elosztóban törölték (vagy vissza van vonva),
+ * az új, érvényes meghívó beváltása újraindítja a fiókot: új jelszó, új hitelesítő, tiszta munkamenetek.
+ * Olyan fiókot nem vesz át, amelynek a hozzáférése él.
+ */
+async function reclaimOrphanedUser(
+  email: string,
+  invitationId: ObjectId,
+  invitedBy: string,
+  name: string,
+  passwordHash: string,
+) {
+  const existing = await findUserByEmail(email);
+  if (!existing || existing.invitationId.equals(invitationId)) return null;
+  if (!(await getAccessState(existing.invitationId)).revoked) return null;
+
+  const updated = await (await users()).findOneAndUpdate(
+    { _id: existing._id, invitationId: existing.invitationId },
+    {
+      $set: { name, passwordHash, totpSecret: seal(generateTotpSecret()), invitationId, invitedBy, createdAt: new Date() },
+      $unset: { totpEnabledAt: "", lastTotpStep: "", lastLoginAt: "" },
+    },
+  );
+  if (!updated) return null;
+  await destroyAllSessions(existing._id);
+  await clearAttempts(`login:${existing.email}`);
+  return existing._id;
 }
 
 /* ---------- Hitelesítő beállítása ---------- */
